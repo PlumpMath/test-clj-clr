@@ -1,4 +1,5 @@
-(ns test-clj-clr.core)
+(ns test-clj-clr.core
+  (:use clojure.repl clojure.pprint))
 
 (defn foo
   "I don't do a whole lot."

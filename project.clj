@@ -20,8 +20,7 @@
         ;; 1. make sure you have curl or wget installed and on PATH,
         ;; 2. uncomment deps in :deps-cmds, and
         ;; 3. use :clj-dep instead of :clj-exe in :main-cmd and :compile-cmd
-        :deps-cmds      [; [:wget  :clj-zip :clj-url] ; edit to use :curl instead of :wget
-                         ; [:unzip "../clj" :clj-zip]
-                         ]
-        :main-cmd      [:clj-exe "Clojure.Main.exe"]
-        :compile-cmd   [:clj-exe "Clojure.Compile.exe"]})
+        :deps-cmds      [[:wget  :clj-zip :clj-url] ; edit to use :curl instead of :wget
+                         [:unzip "../clj" :clj-zip]]
+        :main-cmd      [:clj-dep "Clojure.Main.exe"]
+        :compile-cmd   [:clj-dep "Clojure.Compile.exe"]})
