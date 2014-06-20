@@ -17,7 +17,9 @@
         [(first s)]
         (cons (first s) (take-until pred (rest s)))))))
 
-;; stupid rewrite thing, pending adequate system
+;; stupid rewrite thing, pending adequate system =====
+
+;; zippers ----------------------------------------------
 
 ;; (defn zip-branch-dispatch [x]
 ;;   ())
@@ -42,16 +44,23 @@
 (defn map-entry? [x]
   (instance? clojure.lang.MapEntry x))
 
+(defn standard-branch? [x] (coll? x))
+
+(defn standard-children [x] (seq x))
+
+(defn standard-make-node [x kids]
+  (fn [x kids] ;; future optimizations ahoy
+    (cond
+      (map-entry? x) (vec kids)
+      (into-reverses? x) (into (empty x) (reverse kids))
+      :else (into (empty x) kids))))
+
 ;; map entries still weird, have to be careful
 (defn standard-zip [x]
   (zip/zipper
-    (fn [x] (coll? x))
-    (fn [x] (seq x))
-    (fn [x kids] ;; future optimizations ahoy
-      (cond
-        (map-entry? x) (vec kids)
-        (into-reverses? x) (into (empty x) (reverse kids))
-        :else (into (empty x) kids)))
+    standard-branch?
+    standard-children
+    standard-make-node
     x))
 
 (defn zip-move-over-right [loc]
@@ -61,7 +70,7 @@
       (recur up)
       nil)))
 
-(defn qwik-rewrite [x, f, pred]
+(defn rewrite [pred f x]
   (->> x
     standard-zip
     (iterate
@@ -75,7 +84,12 @@
     first
     zip/root))
 
-;; fixedpoint 
+(declare fixed-point)
+
+(defn rewrite-repeated [pred f x]
+  (fixed-point #(qwik-rewrite pred f % ) x))
+
+;; fixed point ----------------------------------------
 
 (defn to-fixed-point [f x]
   ((fn step [x]
@@ -87,16 +101,21 @@
    x))
 
 (defn fixed-point [f x]
- (loop [x x, x' (f x)]
-   (if (= x x')
-     x
-     (recur x' (f x)))))
+  (loop [x x, x' (f x)]
+    (if (= x x')
+      x
+      (recur x' (f x)))))
 
-;; fix reflection
+;; scan -------------------------------------------
+
+(defn standard-scan [x]
+  (tree-seq standard-branch? standard-children x))
+
+;; fix reflection ----------------------------------
 
 (defn qwik-reflect [x]
-  (qwik-rewrite (clojure.reflect/reflect x)
-    ))
+  (rewrite-repeated (clojure.reflect/reflect x)
+    ()))
 
 ;; protocol introspection, adapted from http://maurits.wordpress.com/2011/01/13/find-which-protocols-are-implemented-by-a-clojure-datatype/
 
