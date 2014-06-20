@@ -95,7 +95,7 @@
 
 ;; fixed point ----------------------------------------
 
-(defn to-fixed-point [f x]
+(defn fixed-point-seq [f x]
   ((fn step [x]
      (cons x
        (lazy-seq
