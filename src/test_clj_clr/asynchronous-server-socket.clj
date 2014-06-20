@@ -41,7 +41,7 @@
             :buffer-size bs
             :buffer (byte-array bs)
             :sb (StringBuilder.)})))))
-n
+
 ;; listener --------------------------------------
 
 ;; weird all-done thing 
@@ -54,25 +54,25 @@ n
 
 (defn read-callback)
 
-(defn accept-callback [^IAsyncResult ar]
-  ;;Signal the main thread to continue
-  (.Set all-done)
-  (let [^Socket listener (ar.AsyncState) ;; still weirds me, see line 74 in example
+(defn accept-callback [^IAsyncResult ar]                      
+  (.Set all-done)                 ; Signal the main thread to continue
+  (let [^Socket listener (ar.AsyncState) ; still weirds me, see line 74 in example
         ^Socket handler (.EndAccept listener ar)
         ^StateObject state (make-StateObject {:work-socket handler})] 
-    (.BeginReceive handler
+    (.BeginReceive handler              
       (:buffer state), 0, (:buffer-size state), 0,
-      (AsyncCallback. read-callback),
+      (AsyncCallback. read-callback),   ; on to next step
       state)
     nil))
 
 (defn get-local-end-point []
-  (let [^IPAddress ipAddress (->
-                               (Dns/GetHostName)
-                               (Dns/GetHostByName)
-                               .AddressList
-                               first)]
-    (IPEndPoint. ipAddress, 11000)))
+  (IPEndPoint.
+    ^IPAddress (->
+                 (Dns/GetHostName)
+                 (Dns/GetHostByName)
+                 .AddressList
+                 first)
+    11000))
 
 (defn get-listener []
   (Socket. AddressFamily/InterNetwork,
@@ -82,6 +82,7 @@ n
 (def kill-switch (atom false))
 
 (defn start-listening []
+  (reset! kill-switch false)
   (let [^IPEndPoint local-end-point (get-local-end-point)
         ^Socket listener (get-listener)]
     (try
@@ -103,3 +104,4 @@ n
     (println "now I guess I need to tell it to continue somehow")
     (println "see loc 65 in example")))
 
+(defn stop-listening (reset! kill-switch false))
