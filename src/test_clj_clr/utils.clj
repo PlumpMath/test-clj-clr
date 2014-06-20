@@ -108,7 +108,7 @@
 
 ;; scan -------------------------------------------
 
-(defn standard-scan [x]
+(defn scan [x]
   (tree-seq standard-branch? standard-children x))
 
 ;; fix reflection ----------------------------------
