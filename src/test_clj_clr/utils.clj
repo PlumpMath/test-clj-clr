@@ -1,4 +1,79 @@
-(ns test-clj-clr.utils)
+(ns test-clj-clr.utils
+  (:require [clojure.reflect :as r]
+            [clojure.zip :as zip])
+  (:import [clojure.reflect
+            Field
+            Property
+            Method
+            Constructor]))
+
+;; stupid rewrite thing, pending adequate system
+
+;; (defn zip-branch-dispatch [x]
+;;   ())
+
+;; (defmulti zip-branch? #'zip-branch-dispatch)
+
+;; (defn zip-children-dispatch [x]
+;;   (type x))
+
+;; (defmulti zip-children #'zip-children-dispatch)
+
+;; (defn zip-make-node-dispatch  )
+
+;; (defmulti zip-make-node #'zip-make-node-dispatch)
+;; bla bla bla
+
+;; cond 
+
+(defn into-reverses? [x]
+  (seq? x))
+
+(defn map-entry? [x]
+  (instance? clojure.lang.MapEntry x))
+
+;; map entries still weird, have to be careful
+(defn standard-zip [x]
+  (zip/zipper
+    (fn [x] (coll? x))
+    (fn [x] (seq x))
+    (fn [x kids] ;; future optimizations ahoy
+      (cond
+        (map-entry? x) (vec kids)
+        (into-reverses? x) (into (empty x) (reverse kids))
+        :else (into (empty x) kids)))
+    x))
+
+(defn qwik-rewrite [f, pred, x]
+  (->> x
+    standard-zip
+    (iterate
+      (fn [loc]
+        (zip/next
+          (zip/edit loc
+            (fn [node]
+              (if (pred node)
+                (f node)
+                node))))))
+    (take-while (complement zip/end?))
+    last
+    root))
+
+;; protocol introspection, adapted from http://maurits.wordpress.com/2011/01/13/find-which-protocols-are-implemented-by-a-clojure-datatype/
+
+(defn protocol? [maybe-p]
+  (boolean (:on-interface maybe-p)))
+
+(defn all-protocols 
+  ([] (all-protocols *ns*))
+  ([ns]
+     (filter #(protocol? @(val %))
+       (ns-publics ns))))
+
+(defn implemented-protocols
+  ([x] (implemented-protocols x *ns*))
+  ([x ns]
+     (filter #(satisfies? @(val %) x) (all-protocols ns))))
 
 ;; macros straight from 1.5
 

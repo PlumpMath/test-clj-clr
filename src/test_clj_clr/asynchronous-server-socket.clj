@@ -17,7 +17,9 @@
             IPAddress
             IPEndPoint]
            [System.Threading
-            ManualResetEvent]))
+            ManualResetEvent]
+           [System.Text
+            Encoding]))
 
 (do 
   (set! *print-length* 20)
@@ -52,7 +54,13 @@
 (defn send []
   :bla)
 
-(defn read-callback)
+(defn read-callback [^IAsyncResult ar]
+  (let [content  String/Empty
+        ^StateObject state (.AsyncState ar)
+        ^Socket handler (.work-socket state)
+        bytes-read (int (.EndReceive handler))]
+    (when (0 < bytes-read)
+      (.. state sb (Append )))))
 
 (defn accept-callback [^IAsyncResult ar]                      
   (.Set all-done)                 ; Signal the main thread to continue
@@ -104,4 +112,4 @@
     (println "now I guess I need to tell it to continue somehow")
     (println "see loc 65 in example")))
 
-(defn stop-listening (reset! kill-switch false))
+(defn stop-listening (reset! kill-switch true))
