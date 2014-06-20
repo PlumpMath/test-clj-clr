@@ -7,6 +7,12 @@
             Method
             Constructor]))
 
+;; probably got the ordering of args wrong.
+;; rewrite isn't really suitable for lazy
+;; sequence, and should apply to maps and things
+;; just as well. Its target should be the first
+;; rather than the last argument.
+
 
 ;; obvious missing functions
 
