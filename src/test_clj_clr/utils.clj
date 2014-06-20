@@ -24,7 +24,7 @@
 ;; (defmulti zip-make-node #'zip-make-node-dispatch)
 ;; bla bla bla
 
-;; cond 
+;; fuck it, let's write one that at least works for clojure data
 
 (defn into-reverses? [x]
   (seq? x))
@@ -58,6 +58,29 @@
     (filter zip/end?)
     first
     zip/root))
+
+;; fixedpoint 
+
+(defn to-fixed-point [f x]
+  ((fn step [x]
+     (cons x
+       (lazy-seq
+         (let [x' (f x)]
+           (when (not= x x')
+             (step x'))))))
+   x))
+
+(defn fixed-point [f x]
+ (loop [x x, x' (f x)]
+   (if (= x x')
+     x
+     (recur x' (f x)))))
+
+;; fix reflection
+
+(defn qwik-reflect [x]
+  (qwik-rewrite (clojure.reflect/reflect x)
+    ))
 
 ;; protocol introspection, adapted from http://maurits.wordpress.com/2011/01/13/find-which-protocols-are-implemented-by-a-clojure-datatype/
 
