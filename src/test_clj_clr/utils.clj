@@ -38,6 +38,9 @@
 
 ;; fuck it, let's write one that at least works for clojure data
 
+;; when time comes to extend this to weird datatypes etc
+;; give the relevant functions an extra options-map argument.
+
 (defn into-reverses? [x]
   (seq? x))
 
@@ -49,11 +52,10 @@
 (defn standard-children [x] (seq x))
 
 (defn standard-make-node [x kids]
-  (fn [x kids] ;; future optimizations ahoy
-    (cond
-      (map-entry? x) (vec kids)
-      (into-reverses? x) (into (empty x) (reverse kids))
-      :else (into (empty x) kids))))
+  (cond ;; future optimizations ahoy
+    (map-entry? x) (vec kids)
+    (into-reverses? x) (into (empty x) (reverse kids))
+    :else (into (empty x) kids)))
 
 ;; map entries still weird, have to be careful
 (defn standard-zip [x]
@@ -70,24 +72,26 @@
       (recur up)
       nil)))
 
-(defn rewrite [pred f x]
-  (->> x
-    standard-zip
-    (iterate
-      (fn [loc]
-        (let [n (zip/node loc)]
-          (if (pred n)
-            (zip-move-over-right
-              (zip/replace loc (f n)))
-            (zip/next loc)))))
-    (filter zip/end?)
-    first
-    zip/root))
+(defn rewrite [pred f x] 
+;; eager version for now. rewrite* or something for lazy.
+;; on the other hand for kind of annoying reasons rewrite*
+;; would be difficult.
+  (loop [loc (standard-zip x)]
+    (if (zip/end? loc)
+      (zip/root loc)
+      (let [n (zip/node loc)]
+        (if (pred n)
+          (let [loc' (zip/edit loc f)
+                loc'' (zip-move-over-right loc')]
+            (if loc''
+              (recur loc'')
+              (zip/root loc')))
+          (recur (zip/next loc)))))))
 
 (declare fixed-point)
 
 (defn rewrite-repeated [pred f x]
-  (fixed-point #(qwik-rewrite pred f % ) x))
+  (fixed-point #(rewrite pred f % ) x))
 
 ;; fixed point ----------------------------------------
 
@@ -114,8 +118,15 @@
 ;; fix reflection ----------------------------------
 
 (defn qwik-reflect [x]
-  (rewrite-repeated (clojure.reflect/reflect x)
-    ()))
+  (rewrite-repeated
+    (fn [x]
+      (or
+        (instance? clojure.reflect.Field x)
+        (instance? clojure.reflect.Property x)
+        (instance? clojure.reflect.Method x)
+        (instance? clojure.reflect.Constructor x)))
+    #(into {:reflection-type (type %)} (seq %))
+    (clojure.reflect/reflect x)))
 
 ;; protocol introspection, adapted from http://maurits.wordpress.com/2011/01/13/find-which-protocols-are-implemented-by-a-clojure-datatype/
 
