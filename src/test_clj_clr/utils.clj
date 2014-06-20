@@ -8,7 +8,7 @@
             Constructor]))
 
 
-;; obvious missing function
+;; obvious missing functions
 
 (defn take-until [pred xs]
   (lazy-seq
@@ -54,8 +54,12 @@
         :else (into (empty x) kids)))
     x))
 
-(defn zip-move-over [loc]
-  ())
+(defn zip-move-over-right [loc]
+  (if-let [rnxt (zip/right loc)]
+    rnxt
+    (if-let [up (zip/up loc)]
+      (recur up)
+      nil)))
 
 (defn qwik-rewrite [x, f, pred]
   (->> x
@@ -63,9 +67,9 @@
     (iterate
       (fn [loc]
         (let [n (zip/node loc)]
-          (if (pred node)
-            (zip-move-over
-              (zip/replace loc (f node)))
+          (if (pred n)
+            (zip-move-over-right
+              (zip/replace loc (f n)))
             (zip/next loc)))))
     (filter zip/end?)
     first
