@@ -31,14 +31,17 @@
      ^bytes buffer
      ^StringBuilder sb])
 
-(defn make-StateObject []
-  (let [bs (int 1024)]
-    (map->StateObject
-      {:work-socket nil
-       :buffer-size bs
-       :buffer (byte-array bs)
-       :sb (StringBuilder.)})))
-
+(defn make-StateObject 
+  ([] (make-StateObject {}))
+  ([opts]
+     (let [bs (int 1024)]
+       (map->StateObject
+         (merge opts
+           {:work-socket nil
+            :buffer-size bs
+            :buffer (byte-array bs)
+            :sb (StringBuilder.)})))))
+n
 ;; listener --------------------------------------
 
 ;; weird all-done thing 
@@ -56,9 +59,12 @@
   (.Set all-done)
   (let [^Socket listener (ar.AsyncState) ;; still weirds me, see line 74 in example
         ^Socket handler (.EndAccept listener ar)
-        ^StateObject state ( (make-StateObject)
-                             (set! ))] 
-    ))
+        ^StateObject state (make-StateObject {:work-socket handler})] 
+    (.BeginReceive handler
+      (:buffer state), 0, (:buffer-size state), 0,
+      (AsyncCallback. read-callback),
+      state)
+    nil))
 
 (defn get-local-end-point []
   (let [^IPAddress ipAddress (->
