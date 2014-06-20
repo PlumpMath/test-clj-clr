@@ -7,6 +7,16 @@
             Method
             Constructor]))
 
+
+;; obvious missing function
+
+(defn take-until [pred xs]
+  (lazy-seq
+    (when-let [s (seq xs)]
+      (if (pred (first s))
+        [(first s)]
+        (cons (first s) (take-until pred (rest s)))))))
+
 ;; stupid rewrite thing, pending adequate system
 
 ;; (defn zip-branch-dispatch [x]
@@ -44,17 +54,19 @@
         :else (into (empty x) kids)))
     x))
 
+(defn zip-move-over [loc]
+  ())
+
 (defn qwik-rewrite [x, f, pred]
   (->> x
     standard-zip
     (iterate
       (fn [loc]
-        (zip/next
-          (zip/edit loc
-            (fn [node]
-              (if (pred node)
-                (f node)
-                node))))))
+        (let [n (zip/node loc)]
+          (if (pred node)
+            (zip-move-over
+              (zip/replace loc (f node)))
+            (zip/next loc)))))
     (filter zip/end?)
     first
     zip/root))
