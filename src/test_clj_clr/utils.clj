@@ -44,7 +44,7 @@
         :else (into (empty x) kids)))
     x))
 
-(defn qwik-rewrite [f, pred, x]
+(defn qwik-rewrite [x, f, pred]
   (->> x
     standard-zip
     (iterate
@@ -55,9 +55,9 @@
               (if (pred node)
                 (f node)
                 node))))))
-    (take-while (complement zip/end?))
-    last
-    root))
+    (filter zip/end?)
+    first
+    zip/root))
 
 ;; protocol introspection, adapted from http://maurits.wordpress.com/2011/01/13/find-which-protocols-are-implemented-by-a-clojure-datatype/
 
