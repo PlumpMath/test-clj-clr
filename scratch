@@ -1,0 +1,145 @@
+(->> (ns-publics *ns*) (map first) sort (map println) dorun)
+
+(do 
+  (set! *print-length* 20)
+  (set! *print-level* 20))
+
+
+;; adapted from http://maurits.wordpress.com/2011/01/13/find-which-protocols-are-implemented-by-a-clojure-datatype/
+(do
+  (defn protocol? [maybe-p]
+    (boolean (:on-interface maybe-p)))
+  
+  (defn all-protocols 
+    ([] (all-protocols *ns*))
+    ([ns]
+       (filter #(protocol? @(val %))
+         (ns-publics ns))))
+  
+  (defn implemented-protocols
+    ([x] (implemented-protocols x *ns*))
+    ([x ns]
+       (filter #(satisfies? @(val %) x) (all-protocols ns))))) 
+
+;; this is horrible but it's what we've got
+(do
+  (defn qwik-scan [x]
+    (tree-seq
+      #(instance? clojure.lang.Seqable %)
+      seq
+      x))
+
+  (defn pred-scan [pred, xs]
+    (filter pred (qwik-scan xs))))
+
+;; and it fails for records etc. what bullshit.
+(do
+  (set! *print-length* 20)
+  (set! *print-level* 20))
+
+;; the following is barbaric and loathesome
+
+(do
+  (use '[clojure.reflect :only [reflect]])
+  (import '[clojure.reflect Field Method Constructor Property]))
+
+(defn fields [c]
+  (pred-scan #(instance? clojure.reflect.Field %)
+    (reflect c)))
+
+(import System.Reflection.Assembly)
+
+(System.Reflection.Assembly/GetExecutingAssembly)
+
+
+(let [at-namespace "..."
+      q  (for [t (.GetTypes (System.Reflection.Assembly/GetExecutingAssembly))
+               :when (and (. IsClass t) (= at-namespace (.Namespace t)))]
+           t)]
+  (map #(.Name %) q))
+
+(for [m some-methods :let [m' (into {} (seq m))]]
+  (select-keys m' [:name :parameter-types]))
+
+;; this one's cool:----------------------------------
+
+(defn ancestor-intersect [& xs]
+  (->> xs
+    (map
+      (comp
+        set
+        ancestors
+        #(if (or (class? %) (protocol? %)) % (type %))))
+    (apply clojure.set/intersection)))
+
+(do
+  (defmacro as->
+    "Binds name to expr, evaluates the first form in the lexical context
+  of that binding, then binds name to that result, repeating for each
+  successive form, returning the result of the last form."
+    {:added "1.5"}
+    [expr name & forms]
+    `(let [~name ~expr
+           ~@(interleave (repeat name) forms)]
+       ~name))
+
+
+  (defmacro cond->
+    "Takes an expression and a set of test/form pairs. Threads expr (via ->)
+  through each form for which the corresponding test
+  expression is true. Note that, unlike cond branching, cond-> threading does
+  not short circuit after the first true test expression."
+    {:added "1.5"}
+    [expr & clauses]
+    (assert (even? (count clauses)))
+    (let [g (gensym)
+          pstep (fn [[test step]] `(if ~test (-> ~g ~step) ~g))]
+      `(let [~g ~expr
+             ~@(interleave (repeat g) (map pstep (partition 2 clauses)))]
+         ~g)))
+
+  (defmacro cond->>
+    "Takes an expression and a set of test/form pairs. Threads expr (via ->>)
+  through each form for which the corresponding test expression
+  is true.  Note that, unlike cond branching, cond->> threading does not short circuit
+  after the first true test expression."
+    {:added "1.5"}
+    [expr & clauses]
+    (assert (even? (count clauses)))
+    (let [g (gensym)
+          pstep (fn [[test step]] `(if ~test (->> ~g ~step) ~g))]
+      `(let [~g ~expr
+             ~@(interleave (repeat g) (map pstep (partition 2 clauses)))]
+         ~g)))
+
+  (defmacro as->
+    "Binds name to expr, evaluates the first form in the lexical context
+  of that binding, then binds name to that result, repeating for each
+  successive form, returning the result of the last form."
+    {:added "1.5"}
+    [expr name & forms]
+    `(let [~name ~expr
+           ~@(interleave (repeat name) forms)]
+       ~name))
+
+  (defmacro some->
+    "When expr is not nil, threads it into the first form (via ->),
+  and when that result is not nil, through the next etc"
+    {:added "1.5"}
+    [expr & forms]
+    (let [g (gensym)
+          pstep (fn [step] `(if (nil? ~g) nil (-> ~g ~step)))]
+      `(let [~g ~expr
+             ~@(interleave (repeat g) (map pstep forms))]
+         ~g)))
+
+  (defmacro some->>
+    "When expr is not nil, threads it into the first form (via ->>),
+  and when that result is not nil, through the next etc"
+    {:added "1.5"}
+    [expr & forms]
+    (let [g (gensym)
+          pstep (fn [step] `(if (nil? ~g) nil (->> ~g ~step)))]
+      `(let [~g ~expr
+             ~@(interleave (repeat g) (map pstep forms))]
+         ~g))))
