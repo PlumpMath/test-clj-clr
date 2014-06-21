@@ -134,6 +134,22 @@
     #(into {:reflection-type (type %)} (seq %))
     (clojure.reflect/reflect x)))
 
+;; submap ------------------------------------------
+
+(defn submap?
+  [sub-map m]
+  (every?
+    (fn [^clojure.lang.MapEntry e]
+      (= e (find m (key e))))
+    sub-map))
+
+;; from http://stackoverflow.com/questions/20421405/how-to-check-if-a-map-is-a-subset-of-another-in-clojure
+(defn submap?
+  "Checks whether m contains all entries in sub."
+  [^java.util.Map m ^java.util.Map sub]
+  (.containsAll (.entrySet m) (.entrySet sub)))
+
+
 ;; protocol introspection, adapted from http://maurits.wordpress.com/2011/01/13/find-which-protocols-are-implemented-by-a-clojure-datatype/
 
 (defn protocol? [maybe-p]
