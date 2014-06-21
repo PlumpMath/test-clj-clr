@@ -199,6 +199,19 @@
       reflection-type?
       #(into {:reflection-type (type %)} (seq %)))))
 
+(declare map-keys)
+
+(defn qwik-members [x & {:as opts0}]
+  (let [opts (merge {:ancestors true} opts0)]
+    (map-keys
+      {clojure.reflect.Method :methods
+       clojure.reflect.Field :fields
+       clojure.reflect.Property :properties
+       clojure.reflect.Constructor :constructors}
+      (group-by
+        :reflection-type
+        (:members (apply-kw qwik-reflect x opts))))))
+
 ;; basic map ops ------------------------------------------
 
 (defn submap?
