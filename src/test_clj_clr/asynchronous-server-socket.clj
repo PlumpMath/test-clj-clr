@@ -71,7 +71,7 @@
         ^StateObject state (make-StateObject {:work-socket handler})] 
     (.BeginReceive handler              
       (:buffer state), 0, (:buffer-size state), 0,
-      (AsyncCallback. read-callback),   ; on to next step
+      (gen-delegate AsyncCallback [x] (read-callback x)),   ; on to next step
       state)
     nil))
 
