@@ -78,21 +78,69 @@
       (recur up)
       nil)))
 
-(defn rewrite [pred f x] 
-;; eager version for now. rewrite* or something for lazy.
-;; on the other hand for kind of annoying reasons rewrite*
-;; would be difficult.
-  (loop [loc (standard-zip x)]
-    (if (zip/end? loc)
-      (zip/root loc)
-      (let [n (zip/node loc)]
-        (if (pred n)
-          (let [loc' (zip/edit loc f)
-                loc'' (zip-move-over-right loc')]
-            (if loc''
-              (recur loc'')
-              (zip/root loc')))
-          (recur (zip/next loc)))))))
+(defn loc-depth [loc]
+  (count (zip/path loc)))
+
+;; here's a great place for pattern matching. oh well.
+;; and lots of other things, this is a hobbled version
+;; of levelspec.
+(defn level-pred [levelspec]
+  (cond
+    (number? levelspec)
+    (fn [loc]
+      (= levelspec (loc-depth loc)))
+    
+    (sequential? levelspec)
+    (let [levelspec' (replace {:infinity Double/PositiveInfinity
+                               :inf Double/PositiveInfinity}
+                       levelspec)
+          [min-lvl max-lvl]
+          (case (count levelspec')
+            1 (cons 0 levelspec')
+            2 levelspec)]
+      (fn [loc]
+        (<= min-lvl (loc-depth loc) max-lvl)))))
+
+;; this is stupid, we need pattern matching of some sort
+;; at least. Is the clojure implementation really incompatible with
+;; clojure-clr?
+;; a yak shave we don't have time for now. Important, tho.
+
+;; this needs a lot more optimization. should be 
+;; able to deal with infinitely deep trees etc
+(defn rewrite-leveled [pred f x levelspec]
+  (let [lp (level-pred levelspec)]
+    (loop [loc (standard-zip x)]
+      (if (zip/end? loc)
+        (zip/root loc)
+        (let [n (zip/node loc)]
+          (if (and (lp loc) (pred n))
+            (let [loc' (zip/edit loc f)
+                  loc'' (zip-move-over-right loc')]
+              (if loc''
+                (recur loc'')
+                (zip/root loc')))
+            (recur (zip/next loc))))))))
+
+(defn rewrite
+  ;; eager version for now. rewrite* or something for lazy.
+  ;; on the other hand for kind of annoying reasons rewrite*
+  ;; would be difficult.
+  ;; Restricting it to certain levels would be easier, tho
+  ([pred f x levelspec]
+     (rewrite-leveled pred f x levelspec))
+  ([pred f x] 
+     (loop [loc (standard-zip x)]
+       (if (zip/end? loc)
+         (zip/root loc)
+         (let [n (zip/node loc)]
+           (if (pred n)
+             (let [loc' (zip/edit loc f)
+                   loc'' (zip-move-over-right loc')]
+               (if loc''
+                 (recur loc'')
+                 (zip/root loc')))
+             (recur (zip/next loc))))))))
 
 (declare fixed-point)
 
@@ -152,7 +200,7 @@
 
 ;; protocol introspection, adapted from http://maurits.wordpress.com/2011/01/13/find-which-protocols-are-implemented-by-a-clojure-datatype/
 
-(defn protocol? [maybe-p]
+(defn protocol? [maybe-p] ;; awfuly stupid
   (boolean (:on-interface maybe-p)))
 
 (defn all-protocols 
