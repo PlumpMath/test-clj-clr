@@ -187,7 +187,7 @@
     reflection-type?
     #(into {:reflection-type (type %)} (seq %))))
 
-;; submap ------------------------------------------
+;; basic map ops ------------------------------------------
 
 (defn submap?
   [sub-map m]
@@ -196,12 +196,94 @@
       (= e (find m (key e))))
     sub-map))
 
-;; from http://stackoverflow.com/questions/20421405/how-to-check-if-a-map-is-a-subset-of-another-in-clojure
-;; (defn submap?
-;;   "Checks whether m contains all entries in sub."
-;;   [^java.util.Map m ^java.util.Map sub]
-;;   (.containsAll (.entrySet m) (.entrySet sub)))
 
+;;; BEGIN ripped directly from https://github.com/runa-dev/kits/blob/master/src/kits/map.clj
+;;; Mapping and Filtering Over Maps
+
+(defn map-values
+  "Apply a function on all values of a map and return the corresponding map (all
+   keys untouched)"
+  [f m]
+  (when m
+    (persistent!
+      (reduce-kv (fn [out-m k v]
+                   (assoc! out-m k (f v)))
+        (transient (empty m))
+        m))))
+
+(defn map-keys
+  "Apply a function on all keys of a map and return the corresponding map (all
+   values untouched)"
+  [f m]
+  (when m
+    (persistent!
+      (reduce-kv (fn [out-m k v]
+                   (assoc! out-m (f k) v))
+        (transient (empty m))
+        m))))
+
+(defn map-values
+  "Apply a function on all values of a map and return the corresponding map (all
+   keys untouched)"
+  [f m]
+  (when m
+    (persistent!
+      (reduce-kv (fn [out-m k v]
+                   (assoc! out-m k (f v)))
+        (transient (empty m))
+        m))))
+
+(defn filter-map
+  "Given a predicate like (fn [k v] ...) returns a map with only entries that
+   match it."
+  [pred m]
+  (when m
+    (persistent!
+      (reduce-kv (fn [out-m k v]
+                   (if (pred k v)
+                     (assoc! out-m k v)
+                     out-m))
+        (transient (empty m))
+        m))))
+
+(defn filter-by-key
+  "Given a predicate like (fn [k] ...) returns a map with only entries with keys
+   that match it."
+  [pred m]
+  (when m
+    (persistent!
+      (reduce-kv (fn [out-m k v]
+                   (if (pred k)
+                     (assoc! out-m k v)
+                     out-m))
+        (transient (empty m))
+        m))))
+
+(defn filter-by-val
+  "Given a predicate like (fn [v] ...) returns a map with only entries with vals
+   that match it."
+  [pred m]
+  (when m
+    (persistent!
+      (reduce-kv (fn [out-m k v]
+                   (if (pred v)
+                     (assoc! out-m k v)
+                     out-m))
+        (transient (empty m))
+        m))))
+
+(defn map-over-map
+  "Given a function like (fn [k v] ...) returns a new map with each entry mapped
+   by it."
+  [f m]
+  (when m
+    (persistent!
+      (reduce-kv (fn [out-m k v]
+                   (apply assoc! out-m (f k v)))
+        (transient (empty m))
+        m))))
+
+;;; END ripped directly from https://github.com/runa-dev/kits/blob/master/src/kits/map.clj
 
 ;; protocol introspection, adapted from http://maurits.wordpress.com/2011/01/13/find-which-protocols-are-implemented-by-a-clojure-datatype/
 
