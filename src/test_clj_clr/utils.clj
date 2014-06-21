@@ -7,12 +7,17 @@
             Method
             Constructor]))
 
-;; probably got the ordering of args wrong.
-;; rewrite isn't really suitable for lazy
-;; sequence, and should apply to maps and things
-;; just as well. Its target should be the first
-;; rather than the last argument.
-
+;; Ye olde midden of missing functions one wishes were in
+;; clojure.core. It would be fantastic to have some more authoritative
+;; tool for including these things than the dread utility project. I
+;; suppose in the context of dependency-management and transitive deps,
+;; projects are essentially reference types, so the only way to
+;; confidently include a utility library perenially subject to breaking
+;; changes is to have lots of little individually stable versions of the
+;; library registered as distinct projects ie clojars repos, with their
+;; distinctness reflected in distinct names. Other option is to automate
+;; some inlining mechanism circumventing dependency management
+;; altogether. Vexsome.
 
 ;; obvious missing functions
 
@@ -174,6 +179,8 @@
 
 ;; fix reflection ----------------------------------
 
+(declare apply-kw)
+
 (defn reflection-type? [x]
   (or
     (instance? clojure.reflect.Method x)
@@ -181,11 +188,12 @@
     (instance? clojure.reflect.Property x)
     (instance? clojure.reflect.Constructor x)))
 
-(defn qwik-reflect [x]
-  (rewrite-repeated
-    (clojure.reflect/reflect x)
-    reflection-type?
-    #(into {:reflection-type (type %)} (seq %))))
+(defn qwik-reflect [x & {:as opts0}]
+  (let [opts (merge {:ancestors true} opts0)]
+    (rewrite-repeated
+      (apply-kw clojure.reflect/reflect opts)
+      reflection-type?
+      #(into {:reflection-type (type %)} (seq %)))))
 
 ;; basic map ops ------------------------------------------
 
@@ -195,6 +203,16 @@
     (fn [^clojure.lang.MapEntry e]
       (= e (find m (key e))))
     sub-map))
+
+;; from https://github.com/runa-dev/kits/blob/master/src/kits/homeless.clj
+(defn apply-kw
+  "Like apply, but f take kw-args.  The last arg to apply-kw is
+   a map of the kw-args to pass to f.
+  EXPECTS: {:pre [(map? (last args))]}"
+  [f & args]
+  (apply f (apply concat
+             (butlast args) (last args))))
+
 
 
 ;;; BEGIN ripped directly from https://github.com/runa-dev/kits/blob/master/src/kits/map.clj
