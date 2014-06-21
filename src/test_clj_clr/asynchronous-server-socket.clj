@@ -1,11 +1,13 @@
-(ns test-clj-clr.core
+(ns test-clj-clr.core ;; WRONG name. Change this by next session
   (:refer-clojure :exclude [send])
   (:require [test-clj-clr.utils :as u])
   (:use clojure.repl
         clojure.pprint
         [clojure.reflect :only [reflect]]
         [clojure.walk :only [prewalk postwalk]])
-  (:import [System.Net.Sockets
+  (:import [System
+            AsyncCallback]
+           [System.Net.Sockets
             Socket
             SocketType
             ProtocolType
@@ -58,13 +60,13 @@
   (let [content  String/Empty
         ^StateObject state (.AsyncState ar)
         ^Socket handler (.work-socket state)
-        bytes-read (int (.EndReceive handler))]
+        bytes-read (int (. handler EndReceive))]
     (when (0 < bytes-read)
       (.. state sb (Append )))))
 
 (defn accept-callback [^IAsyncResult ar]                      
   (.Set all-done)                 ; Signal the main thread to continue
-  (let [^Socket listener (ar.AsyncState) ; still weirds me, see line 74 in example
+  (let [^Socket listener (.AsyncState ar) ; still weirds me, see line 74 in example
         ^Socket handler (.EndAccept listener ar)
         ^StateObject state (make-StateObject {:work-socket handler})] 
     (.BeginReceive handler              

@@ -132,9 +132,9 @@
   ;; on the other hand for kind of annoying reasons rewrite*
   ;; would be difficult.
   ;; Restricting it to certain levels would be easier, tho
-  ([pred x f levelspec]
+  ([x pred f levelspec]
      (rewrite-leveled x pred f levelspec))
-  ([pred x f] 
+  ([x pred f] 
      (loop [loc (standard-zip x)]
        (if (zip/end? loc)
          (zip/root loc)
@@ -154,6 +154,10 @@
      (fixed-point #(rewrite % pred f) x))
   ([x pred f levelspec]
      (fixed-point #(rewrite % pred f levelspec) x)))
+
+;; cases, or whatever ---------------------------------
+
+
 
 ;; fixed point ----------------------------------------
 
@@ -191,7 +195,7 @@
 (defn qwik-reflect [x & {:as opts0}]
   (let [opts (merge {:ancestors true} opts0)]
     (rewrite-repeated
-      (apply-kw clojure.reflect/reflect opts)
+      (apply-kw clojure.reflect/reflect x opts)
       reflection-type?
       #(into {:reflection-type (type %)} (seq %)))))
 
