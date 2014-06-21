@@ -108,7 +108,7 @@
 
 ;; this needs a lot more optimization. should be 
 ;; able to deal with infinitely deep trees etc
-(defn rewrite-leveled [pred f x levelspec]
+(defn rewrite-leveled [x pred f levelspec]
   (let [lp (level-pred levelspec)]
     (loop [loc (standard-zip x)]
       (if (zip/end? loc)
@@ -127,9 +127,9 @@
   ;; on the other hand for kind of annoying reasons rewrite*
   ;; would be difficult.
   ;; Restricting it to certain levels would be easier, tho
-  ([pred f x levelspec]
-     (rewrite-leveled pred f x levelspec))
-  ([pred f x] 
+  ([pred x f levelspec]
+     (rewrite-leveled x pred f levelspec))
+  ([pred x f] 
      (loop [loc (standard-zip x)]
        (if (zip/end? loc)
          (zip/root loc)
@@ -144,8 +144,11 @@
 
 (declare fixed-point)
 
-(defn rewrite-repeated [pred f x]
-  (fixed-point #(rewrite pred f % ) x))
+(defn rewrite-repeated
+  ([x pred f]
+     (fixed-point #(rewrite % pred f) x))
+  ([x pred f levelspec]
+     (fixed-point #(rewrite % pred f levelspec) x)))
 
 ;; fixed point ----------------------------------------
 
@@ -171,16 +174,18 @@
 
 ;; fix reflection ----------------------------------
 
+(defn reflection-type? [x]
+  (or
+    (instance? clojure.reflect.Method x)
+    (instance? clojure.reflect.Field x)
+    (instance? clojure.reflect.Property x)
+    (instance? clojure.reflect.Constructor x)))
+
 (defn qwik-reflect [x]
   (rewrite-repeated
-    (fn [x]
-      (or
-        (instance? clojure.reflect.Field x)
-        (instance? clojure.reflect.Property x)
-        (instance? clojure.reflect.Method x)
-        (instance? clojure.reflect.Constructor x)))
-    #(into {:reflection-type (type %)} (seq %))
-    (clojure.reflect/reflect x)))
+    (clojure.reflect/reflect x)
+    reflection-type?
+    #(into {:reflection-type (type %)} (seq %))))
 
 ;; submap ------------------------------------------
 
