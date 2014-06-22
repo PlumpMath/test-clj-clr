@@ -55,8 +55,12 @@
 
 (defn send-callback [])
 
-(defn send []
-  :bla)
+(defn send [^Socket handler, ^String data]
+  ; Convert the string data to byte data using ASCII encoding.
+  (let [byte-data ^bytes (.GetBytes Encoding/ASCII data)]
+    (.BeginSend handler ; Begin sending the data to the remote device.
+      byte-data, 0, (.Length byte-data), 0,
+      (gen-delegate AsyncCallback [x] (SendCallback x)))))
 
 (defn read-callback [^IAsyncResult ar]
   (let [content  String/Empty
@@ -65,11 +69,11 @@
         bytes-read (int (.EndReceive handler ar))]
     (when (< 0 bytes-read)
       (.. state sb ; There  might be more data, so store the data received so far.
-        (.Append
+        (Append
           (.GetString Encoding/ASCII
             (.buffer state), 0, bytes-read)))
       (let [content (.. state sb (ToString))]
-        (if (< -1 (.IndexOf content "<EOF>"))
+        (if (< -1 (.IndexOf content "<EOF>")) ;; here's the stupid encoding thing
           (do
             (println "Read {0} bytes from socket. \n Data : {1}")
             (send handler, content)) ; Echo the data back to the client.
