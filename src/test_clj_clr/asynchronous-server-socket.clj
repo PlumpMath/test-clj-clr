@@ -29,6 +29,8 @@
 
 ;; StateObject. ----------------------------------------------
 
+(def default-buffer-size (int 1024))
+
 (defrecord StateObject
     [^Socket work-socket
      ^int buffer-size
@@ -36,9 +38,9 @@
      ^StringBuilder sb])
 
 (defn make-StateObject 
-  ([] (make-StateObject {}))
-  ([opts]
-     (let [bs (int 1024)]
+  (^StateObject [] (make-StateObject {}))
+  (^StateObject [opts]
+    (let [bs default-buffer-size]
        (map->StateObject
          (merge opts
            {:work-socket nil
@@ -60,9 +62,21 @@
   (let [content  String/Empty
         ^StateObject state (.AsyncState ar)
         ^Socket handler (.work-socket state)
-        bytes-read (int (. handler EndReceive))]
-    (when (0 < bytes-read)
-      (.. state sb (Append )))))
+        bytes-read (int (.EndReceive handler ar))]
+    (when (< 0 bytes-read)
+      (.. state sb ; There  might be more data, so store the data received so far.
+        (.Append
+          (.GetString Encoding/ASCII
+            (.buffer state), 0, bytes-read)))
+      (let [content (.. state sb (ToString))]
+        (if (< -1 (.IndexOf content "<EOF>"))
+          (do
+            (println "Read {0} bytes from socket. \n Data : {1}")
+            (send handler, content)) ; Echo the data back to the client.
+          (.BeginReceive handler    ; Not all data received. Get more.
+            (.buffer state), 0, (.buffer-size state), 0,
+            (gen-delegate AsyncCallback [x] (read-callback x)),
+            state))))))
 
 (defn accept-callback [^IAsyncResult ar]                      
   (.Set all-done)                 ; Signal the main thread to continue
@@ -71,6 +85,7 @@
         ^StateObject state (make-StateObject {:work-socket handler})] 
     (.BeginReceive handler              
       (:buffer state), 0, (:buffer-size state), 0,
+      ;; sketched out by this next thing:
       (gen-delegate AsyncCallback [x] (read-callback x)),   ; on to next step
       state)
     nil))
