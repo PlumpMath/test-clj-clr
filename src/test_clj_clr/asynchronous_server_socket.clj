@@ -121,7 +121,7 @@
       (format "about to attempt gen-delegate.\n handler : %s" handler))
     (Thread/Sleep 500)
     (.BeginReceive handler            
-      ^bytes (.buffer state), 0, (int (.buffer-size state)), 0,
+      ^bytes (.buffer state), (int 0), (int (.buffer-size state)), (int 0),
       (gen-delegate AsyncCallback [^IAsyncResult x]
         (do
           (println "inside begin-receive's gen-delegate. About to attempt read-callback.")
