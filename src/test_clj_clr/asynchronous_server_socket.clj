@@ -67,9 +67,9 @@
     (let [handler ^Socket (.AsyncState ar) ; Retrieve the socket from the state object.
           bytes-sent (.EndSend handler ar)] ; Complete sending the data to the remote device...
       (println (format "Sent {%s} bytes to client.", bytes-sent))
-      (shutdown-socket handler)))
+      (shutdown-socket handler))
     (catch Exception e
-      (println (.ToString e))))
+      (println (.ToString e)))))
 
 (defn send [^Socket handler, ^String data]
   ; Convert the string data to byte data using ASCII encoding.
@@ -153,7 +153,7 @@
           (format "local end point: %s \n Waiting for connection..."
             local-end-point))
         (begin-accept listener)
-        (.WaitOne all-done))
+        (.WaitOne all-done)) ;; this is mysterious to me; does it block? who?
 
       (catch Exception e
         (println (.ToString e))))
