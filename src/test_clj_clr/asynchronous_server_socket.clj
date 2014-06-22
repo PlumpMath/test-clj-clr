@@ -74,9 +74,16 @@
       (gen-delegate AsyncCallback [x] (send-callback x))
       handler)))
 
+(declare read-callback)
+
+(defn begin-receive [^Socket handler, ^StateObject state]
+  (.BeginReceive handler            
+    (.buffer state), 0, (.buffer-size state), 0,
+    (gen-delegate AsyncCallback [x] (read-callback x)),
+    state))
+
 (defn read-callback [^IAsyncResult ar]
-  (let [content  String/Empty
-        ^StateObject state (.AsyncState ar)
+  (let [^StateObject state (.AsyncState ar)
         ^Socket handler (.work-socket state)
         bytes-read (int (.EndReceive handler ar))]
     (when (< 0 bytes-read)
@@ -92,20 +99,14 @@
                 (.Length content)
                 content))
             (send handler, content)) ; Echo the data back to the client.
-          (.BeginReceive handler    ; Not all data received. Get more.
-            (.buffer state), 0, (.buffer-size state), 0,
-            (gen-delegate AsyncCallback [x] (read-callback x)),
-            state))))))
+          (begin-receive handler, state))))))  ; Not all data received. Get more.
 
 (defn accept-callback [^IAsyncResult ar]                      
   (.Set all-done)                 ; Signal the main thread to continue
   (let [^Socket listener (.AsyncState ar) ; still weirds me, see line 74 in example
         ^Socket handler (.EndAccept listener ar)
-        ^StateObject state (make-StateObject {:work-socket handler})] 
-    (.BeginReceive handler              
-      (:buffer state), 0, (:buffer-size state), 0,
-      (gen-delegate AsyncCallback [x] (read-callback x)),   ; on to next step
-      state)
+        ^StateObject state (make-StateObject {:work-socket handler})]
+    (begin-receive handler, state) ;; on to next step
     nil))
 
 (defn get-local-end-point ^IPEndPoint []
