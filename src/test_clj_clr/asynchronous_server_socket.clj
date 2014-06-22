@@ -5,23 +5,25 @@
         clojure.pprint
         [clojure.reflect :only [reflect]]
         [clojure.walk :only [prewalk postwalk]])
-  (:import [System
-            AsyncCallback]
-           [System.Net.Sockets
-            Socket
-            SocketType
-            ProtocolType
-            SocketShutdown
-            AddressFamily]
-           [System.Net
-            Dns
-            IPHostEntry
-            IPAddress
-            IPEndPoint]
-           [System.Threading
-            ManualResetEvent]
-           [System.Text
-            Encoding]))
+  (:import ;; and away we go
+   [System 
+    AsyncCallback]
+   [System.Net.Sockets
+    Socket
+    SocketType
+    ProtocolType
+    SocketShutdown
+    AddressFamily]
+   [System.Net
+    Dns
+    IPHostEntry
+    IPAddress
+    IPEndPoint]
+   [System.Threading
+    Thread
+    ManualResetEvent]
+   [System.Text
+    Encoding]))
 
 ;; kind of horrible, isn't it?
 ;; kind of from http://msdn.microsoft.com/en-us/library/fx6588te(v=vs.110).aspx
@@ -30,6 +32,23 @@
   (do 
     (set! *print-length* 20)
     (set! *print-level* 20)))
+
+;; forward decs ----------------------------------------------
+
+(declare shutdown-socket read-callback close-state-objects!)
+
+;; debugging ephemera ----------------------------------------
+
+(def error-midden (atom []))
+
+(defn reset-error-midden []
+  (reset! error-midden []))
+
+(defn register-error [e]
+  (swap! error-midden
+    #(do (close-state-objects!)
+         (conj % e))))
+
 
 ;; StateObject. ----------------------------------------------
 
@@ -43,13 +62,11 @@
      ^bytes buffer
      ^StringBuilder sb])
 
-(def open-state-objects
+(def active-state-object-storage
   (atom []))
 
-(declare shutdown-socket)
-
-(defn close-state-objects []
-  (swap! open-state-objects
+(defn close-state-objects! []
+  (swap! active-state-object-storage
     (fn [osos]
       (doseq [so osos]
         (shutdown-socket (:work-socket so)))
@@ -64,7 +81,7 @@
                   :buffer-size default-buffer-size
                   :buffer (byte-array default-buffer-size)
                   :sb (StringBuilder.)}))]
-      (swap! open-state-objects
+      (swap! active-state-object-storage
         #(conj % so)) ;; though it's not open yet
       so)))
 
@@ -74,8 +91,12 @@
 (def ^ManualResetEvent all-done (ManualResetEvent. false))
 
 (defn shutdown-socket [^Socket s]
-  (.Shutdown s SocketShutdown/Both)
-  (.Close s))
+  (println "shutting down socket")
+  (println "socket: " s)
+  (Thread/Sleep 100)
+  (when s
+    (.Shutdown s SocketShutdown/Both)
+    (.Close s)))
 
 (defn send-callback [^IAsyncResult ar]
   (try
@@ -91,16 +112,27 @@
   (let [byte-data ^bytes (.GetBytes Encoding/ASCII data)]
     (.BeginSend handler ; Begin sending the data to the remote device.
       byte-data, 0, (.Length byte-data), 0,
-      (gen-delegate AsyncCallback [x] (send-callback x))
+      (gen-delegate AsyncCallback [^IAsyncResult x] (send-callback x))
       handler)))
 
-(declare read-callback)
-
 (defn begin-receive [^Socket handler, ^StateObject state]
-  (.BeginReceive handler            
-    (.buffer state), 0, (.buffer-size state), 0,
-    (gen-delegate AsyncCallback [x] (read-callback x)),
-    state))
+  (try
+    (println
+      (format "about to attempt gen-delegate.\n handler : %s" handler))
+    (Thread/Sleep 500)
+    (.BeginReceive handler            
+      ^bytes (.buffer state), 0, (int (.buffer-size state)), 0,
+      (gen-delegate AsyncCallback [^IAsyncResult x]
+        (do
+          (println "inside begin-receive's gen-delegate. About to attempt read-callback.")
+          (Thread/Sleep 500)
+          (read-callback x))),
+      state)
+    (Thread/Sleep 500)
+    (println "gen-delegate successful, maybe")
+    (catch Exception e
+      (println "problem caught at begin-receive")
+      (register-error e))))
 
 (defn store-data [^StateObject state, bytes-read]
   (.Append ^StringBuilder (.sb state) ; not sure why this needs type hint :(
@@ -115,6 +147,7 @@
   (send handler, content))         ; Echo the data back to the client.
 
 (defn read-callback [^IAsyncResult ar]
+  (println "at read-callback")
   (let [^StateObject state (.AsyncState ar)
         ^Socket handler    (.work-socket state)
         bytes-read         (int (.EndReceive handler ar))]
@@ -125,7 +158,8 @@
           (complete-read handler, content) 
           (begin-receive handler, state)))))) ; Not all data received. Get more.
 
-(defn accept-callback [^IAsyncResult ar]                      
+(defn accept-callback [^IAsyncResult ar]
+  (println "at accept-callback")
   (.Set all-done)                 ; Signal the main thread to continue
   (let [^Socket listener (.AsyncState ar) ; still weirds me, see line 74 in example
         ^Socket handler (.EndAccept listener ar)
@@ -146,6 +180,7 @@
 (def kill-switch (atom false))
 
 (defn begin-accept [^Socket listener]
+  (println "at begin-accept")
   (.BeginAccept listener
     (gen-delegate AsyncCallback [x] (accept-callback x))
     listener))
@@ -176,4 +211,6 @@
     (println "now I guess I need to tell it to continue somehow")
     (println "see loc 65 in example")))
 
-(defn stop-listening [] (reset! kill-switch true))
+(defn stop-listening []
+  (reset! kill-switch true)
+  (close-state-objects!))
