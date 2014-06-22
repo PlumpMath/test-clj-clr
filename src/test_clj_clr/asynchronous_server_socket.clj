@@ -43,15 +43,30 @@
      ^bytes buffer
      ^StringBuilder sb])
 
+(def open-state-objects
+  (atom []))
+
+(declare shutdown-socket)
+
+(defn close-state-objects []
+  (swap! open-state-objects
+    (fn [osos]
+      (doseq [so osos]
+        (shutdown-socket (:work-socket so)))
+      [])))
+
 (defn make-StateObject 
   (^StateObject [] (make-StateObject {}))
   (^StateObject [opts]
-    (map->StateObject
-      (merge opts
-        {:work-socket nil
-         :buffer-size default-buffer-size
-         :buffer (byte-array default-buffer-size)
-         :sb (StringBuilder.)}))))
+    (let [so (map->StateObject
+               (merge opts
+                 {:work-socket nil
+                  :buffer-size default-buffer-size
+                  :buffer (byte-array default-buffer-size)
+                  :sb (StringBuilder.)}))]
+      (swap! open-state-objects
+        #(conj % so)) ;; though it's not open yet
+      so)))
 
 ;; listener --------------------------------------
 
