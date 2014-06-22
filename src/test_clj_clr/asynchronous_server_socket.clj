@@ -1,4 +1,4 @@
-(ns test-clj-clr.core ;; WRONG name. Change this by next session
+(ns test-clj-clr.asynchronous-server-socket ;; WRONG name. Change this by next session
   (:refer-clojure :exclude [send])
   (:require [test-clj-clr.utils :as u])
   (:use clojure.repl
@@ -23,9 +23,13 @@
            [System.Text
             Encoding]))
 
-(do 
-  (set! *print-length* 20)
-  (set! *print-level* 20))
+;; kind of horrible, isn't it?
+;; kind of from http://msdn.microsoft.com/en-us/library/fx6588te(v=vs.110).aspx
+
+(comment
+  (do 
+    (set! *print-length* 20)
+    (set! *print-level* 20)))
 
 ;; StateObject. ----------------------------------------------
 
@@ -75,10 +79,10 @@
         ^Socket handler (.work-socket state)
         bytes-read (int (.EndReceive handler ar))]
     (when (< 0 bytes-read)
-      (.. state sb ; There  might be more data, so store the data received so far.
-        (Append
-          (.GetString Encoding/ASCII
-            (.buffer state), 0, bytes-read)))
+       ; There  might be more data, so store the data received so far.
+      (.Append ^StringBuilder (.sb state)
+        (.GetString Encoding/ASCII
+          (.buffer state), 0, bytes-read))
       (let [content (.. state sb (ToString))]
         (if (< -1 (.IndexOf content "<EOF>")) ;; here's the stupid encoding thing
           (do
@@ -101,16 +105,13 @@
       state)
     nil))
 
-(defn get-local-end-point []
+(defn get-local-end-point ^IPEndPoint []
   (IPEndPoint.
-    ^IPAddress (->
-                 (Dns/GetHostName)
-                 (Dns/GetHostByName)
-                 .AddressList
-                 first)
+    ^IPAddress
+    (first (.AddressList (Dns/GetHostByName (Dns/GetHostName))))
     11000))
 
-(defn get-listener []
+(defn get-listener ^Socket []
   (Socket. AddressFamily/InterNetwork,
     SocketType/Stream,
     ProtocolType/Tcp))
@@ -129,8 +130,8 @@
       (while (not @kill-switch) ;;supposed to be infinitish
         (.Reset all-done)
         (println "Waiting for connection...")
-        (.BeginAccept socket
-          (AsyncCallback. accept-callback)
+        (.BeginAccept listener
+          (gen-delegate AsyncCallback [x] (accept-callback x))
           listener)
         (.WaitOne all-done))
 
@@ -140,4 +141,4 @@
     (println "now I guess I need to tell it to continue somehow")
     (println "see loc 65 in example")))
 
-(defn stop-listening (reset! kill-switch true))
+(defn stop-listening [] (reset! kill-switch true))
