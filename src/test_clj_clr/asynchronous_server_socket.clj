@@ -112,7 +112,7 @@
   ; Convert the string data to byte data using ASCII encoding.
   (let [byte-data ^bytes (.GetBytes Encoding/ASCII data)]
     (.BeginSend handler ; Begin sending the data to the remote device.
-      byte-data, 0, (.Length byte-data), 0,
+      byte-data, (int 0,) (.Length byte-data), (int 0),
       (gen-delegate AsyncCallback [^IAsyncResult x] (send-callback x))
       handler)))
 
