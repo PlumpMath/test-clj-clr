@@ -76,11 +76,12 @@
   (^StateObject [] (make-StateObject {}))
   (^StateObject [opts]
     (let [so (map->StateObject
-               (merge opts
+               (merge 
                  {:work-socket nil
                   :buffer-size default-buffer-size
                   :buffer (byte-array default-buffer-size)
-                  :sb (StringBuilder.)}))]
+                  :sb (StringBuilder.)}
+                 opts))]
       (swap! active-state-object-storage
         #(conj % so)) ;; though it's not open yet
       so)))
@@ -146,11 +147,21 @@
       content))
   (send handler, content))         ; Echo the data back to the client.
 
+(defn end-receive [^Socket handler ^IAsyncResult ar]
+  ;; only breaking out like this for stacktrace
+  (println (format "at end-receive.\n handler: %s\n IAsyncResult: %s " handler ar ))
+  (Thread/Sleep 100)
+  (let [i (int (.EndReceive handler ar))]
+    (println (format "end-receive result : %s" i))
+    (Thread/Sleep 100)
+    i))
+
 (defn read-callback [^IAsyncResult ar]
   (println "at read-callback")
+  (Thread/Sleep 500)
   (let [^StateObject state (.AsyncState ar)
         ^Socket handler    (.work-socket state)
-        bytes-read         (int (.EndReceive handler ar))]
+        bytes-read         (int (end-receive handler ar))]
     (when (< 0 bytes-read)
       (store-data state, bytes-read) ; There  might be more data, so store the data received so far.
       (let [content (.. state sb (ToString))]
@@ -164,6 +175,9 @@
   (let [^Socket listener (.AsyncState ar) ; still weirds me, see line 74 in example
         ^Socket handler (.EndAccept listener ar)
         ^StateObject state (make-StateObject {:work-socket handler})]
+    (println
+      (format "in accept-callback.\n listener: %s\n handler: %s\n state: %s"
+        listener handler state))
     (begin-receive handler, state) ;; on to next step
     nil))
 
