@@ -1,4 +1,4 @@
-(ns test-clj-clr.asynchronous-server-socket ;; WRONG name. Change this by next session
+(ns test-clj-clr.asynchronous-server-socket
   (:refer-clojure :exclude [send])
   (:require [test-clj-clr.utils :as u])
   (:use clojure.repl
@@ -35,7 +35,7 @@
 
 (def default-buffer-size (int 1024))
 
-(defrecord StateObject
+(defrecord StateObject ;; these typehints are distressingly impotent
     [^Socket work-socket
      ^int buffer-size
      ^bytes buffer
@@ -44,13 +44,12 @@
 (defn make-StateObject 
   (^StateObject [] (make-StateObject {}))
   (^StateObject [opts]
-    (let [bs default-buffer-size]
-       (map->StateObject
-         (merge opts
-           {:work-socket nil
-            :buffer-size bs
-            :buffer (byte-array bs)
-            :sb (StringBuilder.)})))))
+    (map->StateObject
+      (merge opts
+        {:work-socket nil
+         :buffer-size default-buffer-size
+         :buffer (byte-array default-buffer-size)
+         :sb (StringBuilder.)}))))
 
 ;; listener --------------------------------------
 
@@ -63,7 +62,9 @@
           bytes-sent (.EndSend handler ar)] ; Complete sending the data to the remote device...
       (println "Sent {0} bytes to client.", bytes-sent)
       (.Shutdown handler SocketShutdown/Both)
-      (.Close handler))))
+      (.Close handler))
+    (catch Exception e
+      (println (.ToString e)))))
 
 (defn send [^Socket handler, ^String data]
   ; Convert the string data to byte data using ASCII encoding.
@@ -80,7 +81,7 @@
         bytes-read (int (.EndReceive handler ar))]
     (when (< 0 bytes-read)
        ; There  might be more data, so store the data received so far.
-      (.Append ^StringBuilder (.sb state)
+      (.Append ^StringBuilder (.sb state) ;; not sure why this needs type hint :(
         (.GetString Encoding/ASCII
           (.buffer state), 0, bytes-read))
       (let [content (.. state sb (ToString))]
@@ -100,7 +101,6 @@
         ^StateObject state (make-StateObject {:work-socket handler})] 
     (.BeginReceive handler              
       (:buffer state), 0, (:buffer-size state), 0,
-      ;; sketched out by this next thing:
       (gen-delegate AsyncCallback [x] (read-callback x)),   ; on to next step
       state)
     nil))
