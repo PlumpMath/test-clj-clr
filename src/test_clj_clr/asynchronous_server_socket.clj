@@ -60,7 +60,7 @@
   (try
     (let [handler ^Socket (.AsyncState ar) ; Retrieve the socket from the state object.
           bytes-sent (.EndSend handler ar)] ; Complete sending the data to the remote device...
-      (println "Sent {0} bytes to client.", bytes-sent)
+      (println (format "Sent {%s} bytes to client.", bytes-sent))
       (.Shutdown handler SocketShutdown/Both)
       (.Close handler))
     (catch Exception e
@@ -87,7 +87,10 @@
       (let [content (.. state sb (ToString))]
         (if (< -1 (.IndexOf content "<EOF>")) ;; here's the stupid encoding thing
           (do
-            (println "Read {0} bytes from socket. \n Data : {1}")
+            (println
+              (format "Read {%s} bytes from socket. \n Data : {%s}"
+                (.Length content)
+                content))
             (send handler, content)) ; Echo the data back to the client.
           (.BeginReceive handler    ; Not all data received. Get more.
             (.buffer state), 0, (.buffer-size state), 0,
