@@ -35,6 +35,8 @@
 
 (def default-buffer-size (int 1024))
 
+;; the mutable data in StateObject's going to mutate
+
 (defrecord StateObject ;; these typehints are distressingly impotent
     [^Socket work-socket
      ^int buffer-size
@@ -56,15 +58,18 @@
 ;; weird all-done thing 
 (def ^ManualResetEvent all-done (ManualResetEvent. false))
 
+(defn shutdown-socket [^Socket s]
+  (.Shutdown s SocketShutdown/Both)
+  (.Close s))
+
 (defn send-callback [^IAsyncResult ar]
   (try
     (let [handler ^Socket (.AsyncState ar) ; Retrieve the socket from the state object.
           bytes-sent (.EndSend handler ar)] ; Complete sending the data to the remote device...
       (println (format "Sent {%s} bytes to client.", bytes-sent))
-      (.Shutdown handler SocketShutdown/Both)
-      (.Close handler))
+      (shutdown-socket handler)))
     (catch Exception e
-      (println (.ToString e)))))
+      (println (.ToString e))))
 
 (defn send [^Socket handler, ^String data]
   ; Convert the string data to byte data using ASCII encoding.
@@ -82,24 +87,28 @@
     (gen-delegate AsyncCallback [x] (read-callback x)),
     state))
 
+(defn store-data [^StateObject state, bytes-read]
+  (.Append ^StringBuilder (.sb state) ; not sure why this needs type hint :(
+    (.GetString Encoding/ASCII
+      (.buffer state), 0, (int bytes-read))))
+
+(defn complete-read [^Socket handler, ^String content]
+  (println
+    (format "Read {%s} bytes from socket. \n Data : {%s}"
+      (.Length content)
+      content))
+  (send handler, content))         ; Echo the data back to the client.
+
 (defn read-callback [^IAsyncResult ar]
   (let [^StateObject state (.AsyncState ar)
-        ^Socket handler (.work-socket state)
-        bytes-read (int (.EndReceive handler ar))]
+        ^Socket handler    (.work-socket state)
+        bytes-read         (int (.EndReceive handler ar))]
     (when (< 0 bytes-read)
-       ; There  might be more data, so store the data received so far.
-      (.Append ^StringBuilder (.sb state) ;; not sure why this needs type hint :(
-        (.GetString Encoding/ASCII
-          (.buffer state), 0, bytes-read))
+      (store-data state, bytes-read) ; There  might be more data, so store the data received so far.
       (let [content (.. state sb (ToString))]
-        (if (< -1 (.IndexOf content "<EOF>")) ;; here's the stupid encoding thing
-          (do
-            (println
-              (format "Read {%s} bytes from socket. \n Data : {%s}"
-                (.Length content)
-                content))
-            (send handler, content)) ; Echo the data back to the client.
-          (begin-receive handler, state))))))  ; Not all data received. Get more.
+        (if (< -1 (.IndexOf content "<EOF>")) ; here's the stupid encoding thing
+          (complete-read handler, content) 
+          (begin-receive handler, state)))))) ; Not all data received. Get more.
 
 (defn accept-callback [^IAsyncResult ar]                      
   (.Set all-done)                 ; Signal the main thread to continue
@@ -111,8 +120,7 @@
 
 (defn get-local-end-point ^IPEndPoint []
   (IPEndPoint.
-    ^IPAddress
-    (first (.AddressList (Dns/GetHostByName (Dns/GetHostName))))
+    ^IPAddress (first (.AddressList (Dns/GetHostByName (Dns/GetHostName))))
     11000))
 
 (defn get-listener ^Socket []
@@ -121,6 +129,11 @@
     ProtocolType/Tcp))
 
 (def kill-switch (atom false))
+
+(defn begin-accept [^Socket listener]
+  (.BeginAccept listener
+    (gen-delegate AsyncCallback [x] (accept-callback x))
+    listener))
 
 (defn start-listening []
   (reset! kill-switch false)
@@ -131,12 +144,15 @@
         (.Bind local-end-point)
         (.Listen 100))
 
-      (while (not @kill-switch) ;;supposed to be infinitish
+      (while (not @kill-switch) ;;supposed to be infinitish.
+        ;; kill-switch is probably a huge async/comms problem, since
+        ;; it doesn't clean anything up. A couple ways to ensure clean-up
+        ;; occur to me, but let's get it working first.
         (.Reset all-done)
-        (println "Waiting for connection...")
-        (.BeginAccept listener
-          (gen-delegate AsyncCallback [x] (accept-callback x))
-          listener)
+        (println
+          (format "local end point: %s \n Waiting for connection..."
+            local-end-point))
+        (begin-accept listener)
         (.WaitOne all-done))
 
       (catch Exception e

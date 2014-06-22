@@ -52,9 +52,6 @@
 ;; when time comes to extend this to weird datatypes etc
 ;; give the relevant functions an extra options-map argument.
 
-(defn into-reverses? [x]
-  (seq? x))
-
 (defn map-entry? [x]
   (instance? clojure.lang.MapEntry x))
 
@@ -65,8 +62,8 @@
 (defn standard-make-node [x kids]
   (cond ;; future optimizations ahoy
     (map-entry? x) (vec kids)
-    (into-reverses? x) (into (empty x) (reverse kids))
-    :else (into (empty x) kids)))
+    (seq? x)       kids
+    :else          (into (empty x) kids)))
 
 ;; map entries still weird, have to be careful
 (defn standard-zip [x]
@@ -111,21 +108,6 @@
 ;; clojure-clr?
 ;; a yak shave we don't have time for now. Important, tho.
 
-;; this needs a lot more optimization. should be 
-;; able to deal with infinitely deep trees etc
-(defn rewrite-leveled [x pred f levelspec]
-  (let [lp (level-pred levelspec)]
-    (loop [loc (standard-zip x)]
-      (if (zip/end? loc)
-        (zip/root loc)
-        (let [n (zip/node loc)]
-          (if (and (lp loc) (pred n))
-            (let [loc' (zip/edit loc f)
-                  loc'' (zip-move-over-right loc')]
-              (if loc''
-                (recur loc'')
-                (zip/root loc')))
-            (recur (zip/next loc))))))))
 
 (defn rewrite
   ;; eager version for now. rewrite* or something for lazy.
@@ -133,7 +115,20 @@
   ;; would be difficult.
   ;; Restricting it to certain levels would be easier, tho
   ([x pred f levelspec]
-     (rewrite-leveled x pred f levelspec))
+     ;; this needs a lot more optimization. should be 
+     ;; able to deal with infinitely deep trees etc
+     (let [lp (level-pred levelspec)]
+       (loop [loc (standard-zip x)]
+         (if (zip/end? loc)
+           (zip/root loc)
+           (let [n (zip/node loc)]
+             (if (and (lp loc) (pred n))
+               (let [loc' (zip/edit loc f)
+                     loc'' (zip-move-over-right loc')]
+                 (if loc''
+                   (recur loc'')
+                   (zip/root loc')))
+               (recur (zip/next loc))))))))
   ([x pred f] 
      (loop [loc (standard-zip x)]
        (if (zip/end? loc)
