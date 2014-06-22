@@ -53,7 +53,13 @@
 ;; weird all-done thing 
 (def ^ManualResetEvent all-done (ManualResetEvent. false))
 
-(defn send-callback [^IAsyncResult ar] [])
+(defn send-callback [^IAsyncResult ar]
+  (try
+    (let [handler ^Socket (.AsyncState ar) ; Retrieve the socket from the state object.
+          bytes-sent (.EndSend handler ar)] ; Complete sending the data to the remote device...
+      (println "Sent {0} bytes to client.", bytes-sent)
+      (.Shutdown handler SocketShutdown/Both)
+      (.Close handler))))
 
 (defn send [^Socket handler, ^String data]
   ; Convert the string data to byte data using ASCII encoding.
