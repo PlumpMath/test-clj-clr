@@ -89,7 +89,8 @@
 
 ;; listener --------------------------------------
 
-;; weird all-done thing 
+;; weird all-done thing. mathematica analysis isn't picking this up,
+;; need to fix parser
 (def ^ManualResetEvent all-done (ManualResetEvent. false))
 
 (defn shutdown-socket [^Socket s]
@@ -98,7 +99,7 @@
       (try
         (do
           (.Shutdown s SocketShutdown/Both)
-          (.Close s)
+          (.Close s) ;; check out what happens when you close no matter what. fucks shit up.
           (println
             (format "shutdown/close successful. (.Connected s) : %s"
               (.Connected s))))
@@ -116,7 +117,7 @@
   (try
     (let [handler ^Socket (.AsyncState ar) ; Retrieve the socket from the state object.
           bytes-sent (int (.EndSend handler ar))] ; Complete sending the data to the remote device...
-      (println (format "Sent {%s} bytes to client.", bytes-sent))
+      (println (format "Sent %s bytes to client.", bytes-sent))
       (shutdown-socket handler))
     (catch Exception e
       (println (.ToString e)))))
@@ -130,15 +131,11 @@
       handler)))
 
 (defn begin-receive [^Socket handler, ^StateObject state]
-  (try
-    (.BeginReceive handler            
-      ^bytes (.buffer state), (int 0), (int (.buffer-size state)), (int 0),
-      (gen-delegate AsyncCallback [^IAsyncResult x]
-        (read-callback x)),
-      state)
-    (catch Exception e
-      (println "problem caught at begin-receive")
-      (register-error e))))
+  (.BeginReceive handler            
+    ^bytes (.buffer state), (int 0), (int (.buffer-size state)), (int 0),
+    (gen-delegate AsyncCallback [^IAsyncResult x]
+      (read-callback x)),
+    state))
 
 (defn store-data [^StateObject state, bytes-read]
   (.Append ^StringBuilder (.sb state) ; not sure why this needs type hint :(
@@ -147,23 +144,16 @@
 
 (defn complete-read [^Socket handler, ^String content]
   (println
-    (format "Read {%s} bytes from socket. \n Data : {%s}"
+    (format "Read %s bytes from socket. \n Data : %s"
       (.Length content)
       content))
   (send handler, content))         ; Echo the data back to the client.
 
 (defn end-receive [^Socket handler ^IAsyncResult ar]
-  ;; only breaking out like this for stacktrace
-  (println (format "at end-receive.\n handler: %s\n IAsyncResult: %s " handler ar))
-  (Thread/Sleep 100)
-  (let [i (int (.EndReceive handler ar))]
-    (println (format "end-receive result : %s" i))
-    (Thread/Sleep 100)
-    i))
+  (.EndReceive handler ar))
 
 (defn read-callback [^IAsyncResult ar]
-  #_(println "at read-callback")
-  (Thread/Sleep 500)
+  (Thread/Sleep 5000)
   (let [^StateObject state (.AsyncState ar)
         ^Socket handler    (.work-socket state)
         bytes-read         (int (end-receive handler ar))]
@@ -174,15 +164,15 @@
           (complete-read handler, content) 
           (begin-receive handler, state)))))) ; Not all data received. Get more.
 
+;; gratuitously breaking this out for prettier mathematica graph
+(defn end-accept [^Socket listener ^IAsyncResult ar]
+  (.EndAccept listener ar))
+
 (defn accept-callback [^IAsyncResult ar]
-  #_(println "at accept-callback")
   (.Set all-done)                 ; Signal the main thread to continue
   (let [^Socket listener (.AsyncState ar) ; still weirds me, see line 74 in example
-        ^Socket handler (.EndAccept listener ar)
+        ^Socket handler (end-accept listener ar) 
         ^StateObject state (make-StateObject {:work-socket handler})]
-    #_(println
-       (format "in accept-callback.\n listener: %s\n handler: %s\n state: %s"
-         listener handler state))
     (begin-receive handler, state) ;; on to next step
     nil))
 
@@ -199,7 +189,6 @@
 (def kill-switch (atom false))
 
 (defn begin-accept [^Socket listener]
-  #_(println "at begin-accept")
   (.BeginAccept listener
     (gen-delegate AsyncCallback [x] (accept-callback x))
     listener))
