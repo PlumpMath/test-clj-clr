@@ -49,6 +49,7 @@
     #(do (close-state-objects!)
          (conj % e))))
 
+(def start-listening-loops (atom 0))
 
 ;; StateObject. ----------------------------------------------
 
@@ -92,17 +93,29 @@
 (def ^ManualResetEvent all-done (ManualResetEvent. false))
 
 (defn shutdown-socket [^Socket s]
-  (println "shutting down socket")
-  (println "socket: " s)
-  (Thread/Sleep 100)
   (when s
-    (.Shutdown s SocketShutdown/Both)
-    (.Close s)))
+    (let [connected (.Connected s)]
+      (try
+        (do
+          (.Shutdown s SocketShutdown/Both)
+          (.Close s)
+          (println
+            (format "shutdown/close successful. (.Connected s) : %s"
+              (.Connected s))))
+        (catch Exception e
+          (println
+            (format
+              (str
+                "shutdown/close threw error. (.Connected s) : %s"
+                "\n error : %s"
+                "\n------")
+              (.Connected s)
+              e)))))))
 
 (defn send-callback [^IAsyncResult ar]
   (try
     (let [handler ^Socket (.AsyncState ar) ; Retrieve the socket from the state object.
-          bytes-sent (.EndSend handler ar)] ; Complete sending the data to the remote device...
+          bytes-sent (int (.EndSend handler ar))] ; Complete sending the data to the remote device...
       (println (format "Sent {%s} bytes to client.", bytes-sent))
       (shutdown-socket handler))
     (catch Exception e
@@ -118,19 +131,11 @@
 
 (defn begin-receive [^Socket handler, ^StateObject state]
   (try
-    (println
-      (format "about to attempt gen-delegate.\n handler : %s" handler))
-    (Thread/Sleep 500)
     (.BeginReceive handler            
       ^bytes (.buffer state), (int 0), (int (.buffer-size state)), (int 0),
       (gen-delegate AsyncCallback [^IAsyncResult x]
-        (do
-          (println "inside begin-receive's gen-delegate. About to attempt read-callback.")
-          (Thread/Sleep 500)
-          (read-callback x))),
+        (read-callback x)),
       state)
-    (Thread/Sleep 500)
-    (println "gen-delegate successful, maybe")
     (catch Exception e
       (println "problem caught at begin-receive")
       (register-error e))))
@@ -149,7 +154,7 @@
 
 (defn end-receive [^Socket handler ^IAsyncResult ar]
   ;; only breaking out like this for stacktrace
-  (println (format "at end-receive.\n handler: %s\n IAsyncResult: %s " handler ar ))
+  (println (format "at end-receive.\n handler: %s\n IAsyncResult: %s " handler ar))
   (Thread/Sleep 100)
   (let [i (int (.EndReceive handler ar))]
     (println (format "end-receive result : %s" i))
@@ -157,7 +162,7 @@
     i))
 
 (defn read-callback [^IAsyncResult ar]
-  (println "at read-callback")
+  #_(println "at read-callback")
   (Thread/Sleep 500)
   (let [^StateObject state (.AsyncState ar)
         ^Socket handler    (.work-socket state)
@@ -170,14 +175,14 @@
           (begin-receive handler, state)))))) ; Not all data received. Get more.
 
 (defn accept-callback [^IAsyncResult ar]
-  (println "at accept-callback")
+  #_(println "at accept-callback")
   (.Set all-done)                 ; Signal the main thread to continue
   (let [^Socket listener (.AsyncState ar) ; still weirds me, see line 74 in example
         ^Socket handler (.EndAccept listener ar)
         ^StateObject state (make-StateObject {:work-socket handler})]
-    (println
-      (format "in accept-callback.\n listener: %s\n handler: %s\n state: %s"
-        listener handler state))
+    #_(println
+       (format "in accept-callback.\n listener: %s\n handler: %s\n state: %s"
+         listener handler state))
     (begin-receive handler, state) ;; on to next step
     nil))
 
@@ -194,7 +199,7 @@
 (def kill-switch (atom false))
 
 (defn begin-accept [^Socket listener]
-  (println "at begin-accept")
+  #_(println "at begin-accept")
   (.BeginAccept listener
     (gen-delegate AsyncCallback [x] (accept-callback x))
     listener))
@@ -212,6 +217,9 @@
         ;; kill-switch is probably a huge async/comms problem, since
         ;; it doesn't clean anything up. A couple ways to ensure clean-up
         ;; occur to me, but let's get it working first.
+
+        (swap! start-listening-loops inc)
+        
         (.Reset all-done)
         (println
           (format "local end point: %s \n Waiting for connection..."
