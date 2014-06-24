@@ -87,6 +87,8 @@
         #(conj % so)) ;; though it's not open yet
       so)))
 
+;; sticks for poking -----------------------------
+
 ;; listener --------------------------------------
 
 ;; weird all-done thing. mathematica analysis isn't picking this up,
