@@ -7,7 +7,7 @@ import re
 
 # I know I know I know
 def qwik_encode(s):
-    return ' '.join([str(ord(c)) for c in s]) + '<EOF>'
+    return ' '.join([str(ord(c)) for c in s])
 
 def qwik_decode(s):
     return ''.join([chr(int(w)) for w in re.match('(.*?)<EOF>',s).group(1).split()])
@@ -48,8 +48,10 @@ class ReplClient(asyncore.dispatcher):
     def handle_write(self):
         # sent = self.send(self.to_send[:self.chunk_size])
         msg = self.to_send.pop()
-        sendable_msg = msg[:self.chunk_size]
+        sendable_msg = qwik_encode(msg[:self.chunk_size])
         rest_msg = msg[self.chunk_size:]
+        if not bool(rest_msg):
+            sendable_msg += "<EOF>"
         sent = self.send(sendable_msg)
         self.logger.debug('handle_write() -> (%d) "%s"', sent, sendable_msg)
         if bool(rest_msg):
@@ -58,10 +60,11 @@ class ReplClient(asyncore.dispatcher):
     def handle_read(self):
         data = self.recv(self.chunk_size)
         self.logger.debug('handle_read() -> (%d) "%s"', len(data), data)
+        self.logger.debug('decodes to -> %s', qwik_decode(data))
         self.received_data.append(data)
         # here's the input part:
         # self.to_send.append(raw_input('--> ') + "<EOF>")
-        incoming = raw_input('--> ') + "<EOF>"
+        incoming = raw_input('--> ')
         ReplClient(tcp_ip, tcp_port, message=incoming, chunk_size=self.chunk_size)
         
     def add_message(self, msg):
@@ -89,7 +92,7 @@ if __name__ == '__main__':
 
     #client = EchoClient(ip, port, message=open('lorem.txt', 'r').read())
 
-    some_input = raw_input('--> ') + "<EOF>"
+    some_input = raw_input('--> ')
     client = ReplClient(tcp_ip, tcp_port, message=some_input, chunk_size=buffer_size)
     #client = EchoClient(ip, port, message=some_input)
 

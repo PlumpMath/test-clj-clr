@@ -1,6 +1,7 @@
 (ns test-clj-clr.asynchronous-server-socket
   (:refer-clojure :exclude [send])
-  (:require [test-clj-clr.utils :as u])
+  (:require [test-clj-clr.utils :as u]
+            [test-clj-clr.encoding :as encoding])
   (:use clojure.repl
         clojure.pprint
         [clojure.reflect :only [reflect]]
@@ -126,7 +127,9 @@
 
 (defn send [^Socket handler, ^String data]
   ; Convert the string data to byte data using ASCII encoding.
-  (let [byte-data ^bytes (.GetBytes Encoding/ASCII data)]
+  ; And then redundantly do it again, because our head is up our butt.
+  (let [byte-data ^bytes (.GetBytes Encoding/ASCII ^String (encoding/qwik-encode data))]
+    (println (format "In send, about to send %s bytes to client" (.Length byte-data)))
     (.BeginSend handler ; Begin sending the data to the remote device.
       byte-data, (int 0,) (.Length byte-data), (int 0),
       (gen-delegate AsyncCallback [^IAsyncResult x] (send-callback x))
@@ -149,18 +152,20 @@
     (format "Read %s bytes from socket. \n Data : %s"
       (.Length content)
       content))
-  (send handler, content))         ; Echo the data back to the client.
+  (let [decoded (encoding/qwik-decode content)]
+    (println (format "Decoded: %s" decoded))
+    (send handler, decoded)))      ; Echo the data back to the client.
 
 (defn end-receive [^Socket handler ^IAsyncResult ar]
   (.EndReceive handler ar))
 
 (defn read-callback [^IAsyncResult ar]
-  (Thread/Sleep 5000)
   (let [^StateObject state (.AsyncState ar)
         ^Socket handler    (.work-socket state)
         bytes-read         (int (end-receive handler ar))]
     (when (< 0 bytes-read)
-      (store-data state, bytes-read) ; There  might be more data, so store the data received so far.
+      (do (println (format "Storing %s bytes of read data" bytes-read))
+          (store-data state, bytes-read)) ; There  might be more data, so store the data received so far.
       (let [content (.. state sb (ToString))]
         (if (< -1 (.IndexOf content "<EOF>")) ; here's the stupid encoding thing
           (complete-read handler, content) 

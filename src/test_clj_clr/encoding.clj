@@ -1,5 +1,5 @@
 (ns test-clj-clr.encoding
-  (import [System Convert]))
+  (:import [System Convert]))
 
 (defn qwik-encode [s]
   (str
