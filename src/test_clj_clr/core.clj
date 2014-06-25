@@ -1,11 +1,10 @@
 (ns test-clj-clr.core
-  (:use clojure.repl clojure.pprint))
-
-(defn foo
-  "I don't do a whole lot."
-  [x]
-  (println x "Hello, World!"))
+  (:use clojure.repl clojure.pprint)
+  (:require [test-clj-clr.asynchronous-server-socket :as sock]))
 
 (defn -main
   [& args]
-  (apply println "Received args:" args))
+  (apply println "Received args:" args)
+  (binding [*print-length* 20,
+            *print-level* 20]
+    (sock/start-listening)))

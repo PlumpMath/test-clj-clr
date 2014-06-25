@@ -1,7 +1,8 @@
 (ns test-clj-clr.asynchronous-server-socket
   (:refer-clojure :exclude [send])
   (:require [test-clj-clr.utils :as u]
-            [test-clj-clr.encoding :as encoding])
+            [test-clj-clr.encoding :as encoding]
+            [test-clj-clr.evaluation :as evaluation])
   (:use clojure.repl
         clojure.pprint
         [clojure.reflect :only [reflect]]
@@ -154,7 +155,8 @@
       content))
   (let [decoded (encoding/qwik-decode content)]
     (println (format "Decoded: %s" decoded))
-    (send handler, decoded)))      ; Echo the data back to the client.
+    (send handler,
+      (evaluation/evaluate-data decoded))))
 
 (defn end-receive [^Socket handler ^IAsyncResult ar]
   (.EndReceive handler ar))
