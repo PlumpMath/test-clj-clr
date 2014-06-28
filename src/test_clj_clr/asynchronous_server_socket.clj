@@ -103,7 +103,7 @@
       (try
         (do
           (.Shutdown s SocketShutdown/Both)
-          (.Close s) ;; check out what happens when you close no matter what. fucks shit up.
+          (.Close s) 
           (println
             (format "shutdown/close successful. (.Connected s) : %s"
               (.Connected s))))
