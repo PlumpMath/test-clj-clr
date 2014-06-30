@@ -1,5 +1,6 @@
-(ns test-clj-clr.encoding
-  (:import [System Convert]))
+ (ns test-clj-clr.encoding
+   (:require clojure.string)
+   (:import [System Convert]))
 
 (defn qwik-encode [s]
   (str
@@ -8,8 +9,11 @@
     "<EOF>"))
 
 (defn qwik-decode [s]
-  (apply str
-    (map #(char (Convert/ToInt32 %))
-      (clojure.string/split
-        ((re-matches #"(.*?)<EOF>" s) 1)
-        #" "))))
+  (try
+    (apply str
+      (map #(char (Convert/ToInt32 %))
+        (clojure.string/split
+          ((re-matches #"(.*?)<EOF>" s) 1)
+          #" ")))
+    (catch Exception e
+      (str "had trouble. this doesn't parse good: " s))))

@@ -4,6 +4,7 @@ import asyncore
 import logging
 import collections
 import re
+import sys
 
 # I know I know I know
 def qwik_encode(s):
@@ -31,7 +32,7 @@ class ReplClient(asyncore.dispatcher):
         self.logger = logging.getLogger('ReplClient')
         asyncore.dispatcher.__init__(self)
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
-        # self.logger.debug('connecting to %s', (host_, port_))
+        self.logger.debug('connecting to %s', (host_, port_))
         self.connect((host_, port_))
         return
 
@@ -99,7 +100,12 @@ class ReplClient(asyncore.dispatcher):
 if __name__ == '__main__':
     import socket  # note that this is where we import socket
 
-    tcp_ip = '192.168.1.6'
+    #print(sys.argv)
+    #print(sys.argv[1])
+    #tcp_ip = '192.168.1.6'
+    #if 1 < len(sys.argv[1]):
+    #    tcp_ip = sys.argv[1][2]
+    tcp_ip = '127.0.0.1'
     tcp_port = 11000
     buffer_size = 1024
 
