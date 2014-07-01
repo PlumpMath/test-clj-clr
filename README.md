@@ -1,10 +1,10 @@
 # test-clj-clr
 
-A ClojureCLR library designed to ... well, that part is up to you.
+A staging ground for some experiments with clojure-CLR
 
 ## Usage
 
-FIXME
+Don't
 
 ## License
 

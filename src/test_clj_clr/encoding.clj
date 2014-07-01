@@ -1,6 +1,6 @@
- (ns test-clj-clr.encoding
-   (:require clojure.string)
-   (:import [System Convert]))
+(ns test-clj-clr.encoding
+  (:require clojure.string)
+  (:import [System Convert]))
 
 (defn qwik-encode [s]
   (str
