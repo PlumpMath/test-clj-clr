@@ -22,6 +22,7 @@ def input_prompt(s):
 class ReplClient(asyncore.dispatcher):
 
     def __init__(self, host_, port_, message, chunk_size=1024):
+        self.logger = logging.getLogger('ReplClient')
         self.host = host_
         self.port = port_
         self.to_send = collections.deque()
@@ -29,7 +30,6 @@ class ReplClient(asyncore.dispatcher):
         self.add_message(message)
         self.received_data = []
         self.chunk_size = chunk_size
-        self.logger = logging.getLogger('ReplClient')
         asyncore.dispatcher.__init__(self)
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         self.logger.debug('connecting to %s', (host_, port_))
@@ -73,7 +73,6 @@ class ReplClient(asyncore.dispatcher):
         self.to_send.append(msg)
 
 
-
 if __name__ == '__main__':
     import socket 
 
@@ -91,4 +90,3 @@ if __name__ == '__main__':
         some_input = raw_input('--> ')
         client = ReplClient(tcp_ip, tcp_port, message=some_input, chunk_size=buffer_size)
         asyncore.loop()
-
