@@ -28,29 +28,7 @@
         [(first s)]
         (cons (first s) (take-until pred (rest s)))))))
 
-;; stupid rewrite thing, pending adequate system =====
-
 ;; zippers ----------------------------------------------
-
-;; (defn zip-branch-dispatch [x]
-;;   ())
-
-;; (defmulti zip-branch? #'zip-branch-dispatch)
-
-;; (defn zip-children-dispatch [x]
-;;   (type x))
-
-;; (defmulti zip-children #'zip-children-dispatch)
-
-;; (defn zip-make-node-dispatch  )
-
-;; (defmulti zip-make-node #'zip-make-node-dispatch)
-;; bla bla bla
-
-;; fuck it, let's write one that at least works for clojure data
-
-;; when time comes to extend this to weird datatypes etc
-;; give the relevant functions an extra options-map argument.
 
 (defn map-entry? [x]
   (instance? clojure.lang.MapEntry x))
@@ -153,6 +131,29 @@
 ;; cases, or whatever ---------------------------------
 
 
+;; seq stuff ------------------------------------------
+
+(defn seqable? [x]
+  "Based on RT.cs, clojure.core/cast, clojure.core/instance. Uncertain whether it works in all cases"
+  (or
+    (nil? x)
+    (instance? clojure.lang.ASeq x)
+    (instance? clojure.lang.LazySeq x)
+    (instance? clojure.lang.Seqable x)
+    (array? x)
+    (string? x)
+    (instance? System.Collections.IEnumerable x)))
+
+;; dimensions -----------------------------------------
+
+(defn dimensions [x]
+  (when (seqable? x)
+    (persistent!
+      (reduce
+        (fn [bldg, x]
+          (conj! bldg (dimensions x)))
+        (transient! [(count x)])
+        x))))
 
 ;; fixed point ----------------------------------------
 
@@ -206,6 +207,7 @@
       (group-by
         :reflection-type
         (:members (apply-kw qwik-reflect x opts))))))
+
 
 ;; basic map ops ------------------------------------------
 
